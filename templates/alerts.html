@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Unknown Face Alerts{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1">Unknown Face Alerts</h3>
+            <p class="text-muted mb-0">Faces detected that are not registered in the system</p>
+        </div>
+        <span class="badge bg-danger p-2 fs-6">
+            <i class="bi bi-shield-exclamation me-1"></i>
+            {{ alerts|length }} alert{{ 's' if alerts|length != 1 }}
+        </span>
+    </div>
+
+    <!-- Filter bar -->
+    {% if alerts %}
+    <div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary filter-btn active" data-filter="all">All</button>
+        <button class="btn btn-sm btn-outline-danger  filter-btn" data-filter="Unreviewed">Unreviewed</button>
+        <button class="btn btn-sm btn-outline-secondary filter-btn" data-filter="Reviewed">Reviewed</button>
+        <span class="ms-auto text-muted small">Click any photo to enlarge</span>
+    </div>
+
+    <!-- Alert Cards Grid -->
+    <div class="row g-3" id="alerts-grid">
+        {% for alert in alerts %}
+        <div class="col-sm-6 col-md-4 col-xl-3 alert-item" data-status="{{ alert.alert_status }}">
+            <div class="card alert-card h-100 {% if alert.alert_status == 'Unreviewed' %}border-danger{% endif %}">
+
+                <!-- Photo -->
+                <div class="position-relative alert-img-wrap"
+                    style="overflow:hidden;border-radius:12px 12px 0 0;cursor:zoom-in;"
+                    data-img="{{ url_for('static', filename=alert.image_path) if alert.image_path else '' }}"
+                    data-time="{{ alert.timestamp }}" data-status="{{ alert.alert_status }}"
+                    data-log-id="{{ alert.log_id }}" onclick="openLightbox(this)">
+
+                    {% if alert.image_path %}
+                    <img src="{{ url_for('static', filename=alert.image_path) }}" class="w-100 alert-thumb"
+                        alt="Unknown Face" style="height:190px;object-fit:cover;transition:transform .3s;">
+                    {% else %}
+                    <div class="d-flex align-items-center justify-content-center bg-dark text-muted"
+                        style="height:190px;">
+                        <div class="text-center">
+                            <i class="bi bi-person-x fs-1 d-block mb-1"></i>
+                            <small>No image</small>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Status ribbon -->
+                    <span
+                        class="position-absolute top-0 start-0 m-2 badge
+                                 {% if alert.alert_status == 'Unreviewed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                        {% if alert.alert_status == 'Unreviewed' %}
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>New
+                        {% else %}
+                        <i class="bi bi-check2 me-1"></i>Reviewed
+                        {% endif %}
+                    </span>
+
+                    <!-- Zoom icon overlay -->
+                    <div class="zoom-hint position-absolute bottom-0 end-0 m-2 text-white"
+                        style="opacity:0;transition:opacity .3s;font-size:1.3rem;">
+                        <i class="bi bi-zoom-in"></i>
+                    </div>
+                </div>
+
+                <!-- Card body -->
+                <div class="card-body pt-2 pb-3 px-3">
+                    <div class="d-flex align-items-center mb-2 gap-1">
+                        <i class="bi bi-clock text-muted" style="font-size:.8rem;"></i>
+                        <small class="text-muted">{{ alert.timestamp }}</small>
+                    </div>
+                    {% if alert.alert_status == 'Unreviewed' %}
+                    <a href="{{ url_for('mark_reviewed', log_id=alert.log_id) }}"
+                        class="btn btn-sm btn-outline-success w-100 mb-1">
+                        <i class="bi bi-check2 me-1"></i>Mark Reviewed
+                    </a>
+                    {% else %}
+                    <button class="btn btn-sm btn-outline-secondary w-100 mb-1" disabled>
+                        <i class="bi bi-check-all me-1"></i>Reviewed
+                    </button>
+                    {% endif %}
+                    <!-- Delete button (available on all alerts) -->
+                    <form action="{{ url_for('delete_alert', log_id=alert.log_id) }}" method="POST"
+                        onsubmit="return confirm('Permanently delete this alert and its image? This cannot be undone.')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                            <i class="bi bi-trash3 me-1"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- Empty state -->
+    <div class="card">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-shield-check fs-1 d-block mb-2 text-success"></i>
+            <h5>No Alerts</h5>
+            <p>No unknown faces have been detected. The system is secure.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Lightbox Modal ───────────────────────────── -->
+<div class="modal fade" id="lightboxModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:680px;">
+        <div class="modal-content" style="background:#0f172a;border:none;border-radius:16px;overflow:hidden;">
+            <!-- Header -->
+            <div class="modal-header border-0 pb-0" style="background:#0f172a;">
+                <div>
+                    <h6 class="modal-title text-white fw-semibold mb-0">
+                        <i class="bi bi-person-x-fill text-danger me-2"></i>Unknown Face
+                    </h6>
+                    <small id="lb-time" class="text-muted"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <!-- Image -->
+            <div class="modal-body p-0" style="background:#0f172a;">
+                <img id="lb-img" src="" alt="Unknown Face" class="w-100"
+                    style="max-height:500px;object-fit:contain;display:block;">
+                <div id="lb-no-img" class="text-center text-muted py-5" style="display:none;">
+                    <i class="bi bi-person-x fs-1 d-block mb-2"></i>
+                    <p>No image available for this alert.</p>
+                </div>
+            </div>
+            <!-- Footer -->
+            <div class="modal-footer border-0 pt-0 pb-3" style="background:#0f172a;">
+                <span id="lb-badge" class="badge me-auto"></span>
+                <a id="lb-download" href="#" download class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-download me-1"></i>Download
+                </a>
+                <!-- Hidden form for delete action -->
+                <form id="lb-delete-form" method="POST" action="#"
+                    onsubmit="return confirm('Permanently delete this alert and its image? This cannot be undone.')">
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash3 me-1"></i>Delete
+                    </button>
+                </form>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .alert-img-wrap:hover .alert-thumb {
+        transform: scale(1.06);
+    }
+
+    .alert-img-wrap:hover .zoom-hint {
+        opacity: 1 !important;
+    }
+
+    .filter-btn.active {
+        font-weight: 600;
+    }
+</style>
+
+<script>
+    // ── Lightbox ─────────────────────────────────────
+    function openLightbox(el) {
+        const imgSrc = el.dataset.img;
+        const time = el.dataset.time;
+        const status = el.dataset.status;
+        const logId = el.dataset.logId;
+        const lbImg = document.getElementById('lb-img');
+        const lbNoImg = document.getElementById('lb-no-img');
+        const lbTime = document.getElementById('lb-time');
+        const lbBadge = document.getElementById('lb-badge');
+        const lbDl = document.getElementById('lb-download');
+        const lbDelForm = document.getElementById('lb-delete-form');
+
+        lbTime.textContent = time;
+
+        // Set delete form action to the correct alert
+        lbDelForm.action = '/delete_alert/' + logId;
+
+        if (imgSrc) {
+            lbImg.src = imgSrc;
+            lbImg.style.display = 'block';
+            lbNoImg.style.display = 'none';
+            lbDl.href = imgSrc;
+            lbDl.style.display = 'inline-block';
+        } else {
+            lbImg.style.display = 'none';
+            lbNoImg.style.display = 'block';
+            lbDl.style.display = 'none';
+        }
+
+        lbBadge.className = 'badge me-auto ' +
+            (status === 'Unreviewed' ? 'bg-danger' : 'bg-secondary');
+        lbBadge.innerHTML = status === 'Unreviewed'
+            ? '<i class="bi bi-exclamation-triangle-fill me-1"></i>Unreviewed'
+            : '<i class="bi bi-check2 me-1"></i>Reviewed';
+
+        new bootstrap.Modal(document.getElementById('lightboxModal')).show();
+    }
+
+    // ── Filter buttons ───────────────────────────────
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const f = btn.dataset.filter;
+            document.querySelectorAll('.alert-item').forEach(item => {
+                item.style.display =
+                    (f === 'all' || item.dataset.status === f) ? '' : 'none';
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,591 @@
+{% extends "base.html" %}
+{% block title %}Register Face{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1">Register New Face</h3>
+            <p class="text-muted mb-0">Add a new person using live camera capture (50 photos) or file upload</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Registration Panel -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header pb-0 border-0">
+                    <ul class="nav nav-tabs card-header-tabs" id="regTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" id="tab-camera" data-bs-toggle="tab"
+                                data-bs-target="#pane-camera" type="button">
+                                <i class="bi bi-camera-video-fill me-1"></i> Live Camera
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="tab-upload" data-bs-toggle="tab" data-bs-target="#pane-upload"
+                                type="button">
+                                <i class="bi bi-upload me-1"></i> Upload Photo
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card-body">
+                    <div class="tab-content">
+
+                        <!-- ── CAMERA TAB ── -->
+                        <div class="tab-pane fade show active" id="pane-camera">
+                            <div class="mb-3">
+                                <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="cam-name" placeholder="Enter full name">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="cam-email"
+                                    placeholder="Enter email (optional)">
+                            </div>
+
+                            <!-- Live video element (browser getUserMedia) -->
+                            <div class="mb-3 position-relative" id="cam-preview-box" style="display:none;">
+                                <video id="cam-video" class="w-100 rounded-3" autoplay muted playsinline style="height:260px;object-fit:cover;border:2px solid #3b82f6;
+                                              transform:scaleX(-1);"></video>
+                                <!-- Hidden canvas used for frame capture only -->
+                                <canvas id="cap-canvas" style="display:none;"></canvas>
+
+                                <!-- Flash overlay: briefly flashes white when a frame is captured -->
+                                <div id="flash-overlay" class="position-absolute top-0 start-0 w-100 h-100 rounded-3"
+                                    style="background:white;opacity:0;pointer-events:none;
+                                            transition:opacity 0.05s;border-radius:12px;"></div>
+
+                                <!-- Frame counter badge -->
+                                <div id="cap-overlay" class="position-absolute top-0 end-0 m-2 badge"
+                                    style="background:rgba(0,0,0,0.65);font-size:0.9rem;display:none;">
+                                    <i class="bi bi-camera me-1"></i>
+                                    <span id="cap-count">0</span>/50
+                                </div>
+                            </div>
+
+                            <!-- Progress bar -->
+                            <div class="mb-3" id="progress-wrap" style="display:none;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small class="text-muted" id="cap-status">Capturing…</small>
+                                    <small class="fw-semibold text-primary"><span id="cap-pct">0</span>%</small>
+                                </div>
+                                <div class="progress" style="height:10px;border-radius:8px;">
+                                    <div id="cap-bar"
+                                        class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                        style="width:0%;border-radius:8px;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Result alert -->
+                            <div id="cam-result" class="alert d-none mb-3" role="alert"></div>
+
+                            <!-- Buttons -->
+                            <div class="d-grid gap-2">
+                                <button id="btn-open-cam" class="btn btn-outline-primary">
+                                    <i class="bi bi-camera-video me-2"></i>Open Camera
+                                </button>
+                                <button id="btn-start-capture" class="btn btn-success" style="display:none;">
+                                    <i class="bi bi-record-circle me-2"></i>Start Capture (50 photos)
+                                </button>
+                                <button id="btn-cancel-capture" class="btn btn-outline-danger" style="display:none;">
+                                    <i class="bi bi-x-circle me-2"></i>Cancel
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- ── UPLOAD TAB ── -->
+                        <div class="tab-pane fade" id="pane-upload">
+                            <form action="{{ url_for('register') }}" method="POST" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Full Name <span
+                                            class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="name" name="name"
+                                        placeholder="Enter full name" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="email" name="email"
+                                        placeholder="Enter email (optional)">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="photo" class="form-label">
+                                        Face Photo <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="file" class="form-control" id="photo" name="photo"
+                                        accept=".jpg,.jpeg,.png" required>
+                                    <div class="form-text">Upload a clear, front-facing photo (JPG/PNG)</div>
+                                </div>
+                                <div class="mb-3 text-center" id="preview-container" style="display:none;">
+                                    <img id="photo-preview" src="" alt="Preview" class="img-thumbnail"
+                                        style="max-height:200px;">
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-person-check me-2"></i>Register Face
+                                </button>
+                            </form>
+                        </div>
+
+                    </div><!-- /tab-content -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Registered Users Table -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-semibold">
+                        <i class="bi bi-people-fill me-2 text-success"></i>Registered Users
+                    </h6>
+                    <span class="badge bg-primary">{{ users|length }} users</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if users %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Photo</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Registered</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.user_id }}</td>
+                                    <td>
+                                        {% if user.photo_path %}
+                                        <img src="{{ url_for('static', filename=user.photo_path) }}"
+                                            alt="{{ user.name }}" class="rounded-circle"
+                                            style="width:35px;height:35px;object-fit:cover;">
+                                        {% else %}
+                                        <i class="bi bi-person-circle fs-4 text-muted"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td class="fw-medium">{{ user.name }}</td>
+                                    <td>{{ user.email or '—' }}</td>
+                                    <td><small>{{ user.registered_date }}</small></td>
+                                    <td>
+                                        <a href="{{ url_for('delete_user', user_id=user.user_id) }}"
+                                            class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Delete {{ user.name }}?')">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-person-x fs-1 d-block mb-2"></i>
+                        No users registered yet. Add one using the form.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Thumbnail strip -->
+<div id="thumb-strip-wrap" class="container-fluid px-4 pb-4" style="display:none;">
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0 fw-semibold">
+                <i class="bi bi-images me-2 text-primary"></i>Captured Frames Preview
+            </h6>
+        </div>
+        <div class="card-body">
+            <div id="thumb-strip" class="d-flex flex-wrap gap-2"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ── Upload tab: image preview ─────────────────────────────────────
+    document.getElementById('photo').addEventListener('change', function (e) {
+        const c = document.getElementById('preview-container');
+        const p = document.getElementById('photo-preview');
+        if (e.target.files && e.target.files[0]) {
+            const r = new FileReader();
+            r.onload = ev => { p.src = ev.target.result; c.style.display = 'block'; };
+            r.readAsDataURL(e.target.files[0]);
+        } else { c.style.display = 'none'; }
+    });
+
+    // ── Camera capture ────────────────────────────────────────────────
+    const TOTAL_FRAMES = 50;
+    const INTERVAL_MS = 350;   // one frame every 350 ms → ~17 sec total
+
+    let mediaStream = null;
+    let captureTimer = null;
+    let capturedFrames = [];
+    let capturing = false;   // guard flag — prevents double-fires
+
+    const video = document.getElementById('cam-video');
+    const canvas = document.getElementById('cap-canvas');
+    const ctx = canvas.getContext('2d');
+    const flashEl = document.getElementById('flash-overlay');
+
+    const btnOpenCam = document.getElementById('btn-open-cam');
+    const btnStart = document.getElementById('btn-start-capture');
+    const btnCancel = document.getElementById('btn-cancel-capture');
+    const previewBox = document.getElementById('cam-preview-box');
+    const capOverlay = document.getElementById('cap-overlay');
+    const progressWrap = document.getElementById('progress-wrap');
+    const capBar = document.getElementById('cap-bar');
+    const capCount = document.getElementById('cap-count');
+    const capPct = document.getElementById('cap-pct');
+    const capStatus = document.getElementById('cap-status');
+    const camResult = document.getElementById('cam-result');
+    const thumbWrap = document.getElementById('thumb-strip-wrap');
+    const thumbStrip = document.getElementById('thumb-strip');
+
+    function showResult(type, msg) {
+        camResult.className = `alert alert-${type} d-block`;
+        camResult.textContent = msg;
+    }
+    function hideResult() { camResult.className = 'alert d-none'; }
+
+    // ── Open / close camera ───────────────────────────────────────────
+    btnOpenCam.addEventListener('click', async () => {
+        if (!mediaStream) {
+            const name = document.getElementById('cam-name').value.trim();
+            if (!name) { showResult('warning', 'Please enter a name before opening the camera.'); return; }
+            hideResult();
+
+            // navigator.mediaDevices is undefined on plain HTTP with a non-localhost host
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                const isIP = /^\d{1,3}(\.\d{1,3}){3}$/.test(location.hostname);
+                if (location.protocol === 'http:' && isIP) {
+                    showResult('danger',
+                        '❌ Camera blocked: browsers only allow camera access on localhost or HTTPS. ' +
+                        'Please open the app at http://localhost:5000 or http://127.0.0.1:5000 instead of the network IP.');
+                } else {
+                    showResult('danger', '❌ Your browser does not support camera access.');
+                }
+                return;
+            }
+
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = mediaStream;
+                await video.play();
+                previewBox.style.display = 'block';
+                btnStart.style.display = 'block';
+                btnOpenCam.innerHTML = '<i class="bi bi-camera-video-off me-2"></i>Close Camera';
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    showResult('danger', '❌ Camera permission denied. Please allow camera access in your browser and try again.');
+                } else if (err.name === 'NotFoundError') {
+                    showResult('danger', '❌ No camera found. Please connect a webcam and try again.');
+                } else {
+                    showResult('danger', '❌ Could not access camera: ' + err.message);
+                }
+            }
+        } else {
+            shutdownCamera();
+            previewBox.style.display = 'none';
+            btnStart.style.display = 'none';
+            btnOpenCam.innerHTML = '<i class="bi bi-camera-video me-2"></i>Open Camera';
+        }
+    });
+
+    function shutdownCamera() {
+        stopCapture();
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+            mediaStream = null;
+        }
+    }
+
+    // ── Start capture ─────────────────────────────────────────────────
+    btnStart.addEventListener('click', () => {
+        const name = document.getElementById('cam-name').value.trim();
+        if (!name) { showResult('warning', 'Please enter a name first.'); return; }
+        if (!mediaStream) { showResult('warning', 'Camera is not open.'); return; }
+
+        hideResult();
+        capturedFrames = [];
+        thumbStrip.innerHTML = '';
+        thumbWrap.style.display = 'none';
+        progressWrap.style.display = 'block';
+        capOverlay.style.display = 'block';
+        btnStart.style.display = 'none';
+        btnCancel.style.display = 'block';
+        btnOpenCam.disabled = true;
+        capturing = true;
+
+        setProgress(0);
+
+        captureTimer = setInterval(() => {
+            // Guard: stop the interval immediately before any async work
+            if (!capturing || capturedFrames.length >= TOTAL_FRAMES) {
+                clearInterval(captureTimer);
+                captureTimer = null;
+                capturing = false;
+                if (capturedFrames.length >= TOTAL_FRAMES) {
+                    setProgress(TOTAL_FRAMES);
+                    submitRegistration();
+                }
+                return;
+            }
+
+            // Capture from the live <video> element via canvas
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            ctx.save();
+            // un-mirror the canvas (video is mirrored with CSS, but capture should be normal)
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            capturedFrames.push(dataUrl);
+
+            setProgress(capturedFrames.length);
+
+            // Flash effect every frame
+            flashEl.style.opacity = '0.25';
+            setTimeout(() => { flashEl.style.opacity = '0'; }, 60);
+
+            // Thumbnail every 5 frames
+            if (capturedFrames.length % 5 === 0) addThumb(dataUrl, capturedFrames.length);
+        }, INTERVAL_MS);
+    });
+
+    // ── Cancel ────────────────────────────────────────────────────────
+    btnCancel.addEventListener('click', () => {
+        stopCapture();
+        showResult('info', 'Capture cancelled.');
+    });
+
+    function stopCapture() {
+        capturing = false;
+        if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
+        progressWrap.style.display = 'none';
+        capOverlay.style.display = 'none';
+        btnStart.style.display = mediaStream ? 'block' : 'none';
+        btnCancel.style.display = 'none';
+        btnOpenCam.disabled = false;
+        setProgress(0);
+    }
+
+    function setProgress(n) {
+        // Clamp to [0, TOTAL_FRAMES] so percentage never exceeds 100
+        const clamped = Math.min(n, TOTAL_FRAMES);
+        const pct = Math.round((clamped / TOTAL_FRAMES) * 100);
+        capBar.style.width = pct + '%';
+        capCount.textContent = clamped;
+        capPct.textContent = pct;
+        capStatus.textContent = clamped < TOTAL_FRAMES
+            ? `Capturing frame ${clamped} of ${TOTAL_FRAMES}…`
+            : 'Saving photos to disk…';
+    }
+
+    function addThumb(b64, n) {
+        const img = document.createElement('img');
+        img.src = b64;
+        img.title = `Frame ${n}`;
+        img.style.cssText =
+            'width:64px;height:48px;object-fit:cover;border-radius:6px;' +
+            'border:2px solid #3b82f6;transition:transform .2s;cursor:pointer;';
+        img.addEventListener('mouseenter', () => img.style.transform = 'scale(1.2)');
+        img.addEventListener('mouseleave', () => img.style.transform = 'scale(1)');
+        thumbStrip.appendChild(img);
+        thumbWrap.style.display = 'block';
+    }
+
+    // ── Submit to server (save only, no training) ─────────────────────
+    async function submitRegistration() {
+        const name = document.getElementById('cam-name').value.trim();
+        const email = document.getElementById('cam-email').value.trim();
+
+        capStatus.textContent = `Saving ${capturedFrames.length} photos…`;
+        btnOpenCam.disabled = true;
+
+        try {
+            const resp = await fetch('/register_camera', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, frames: capturedFrames })
+            });
+            const data = await resp.json();
+
+            progressWrap.style.display = 'none';
+            capOverlay.style.display = 'none';
+            btnOpenCam.disabled = false;
+
+            if (data.success) {
+                showResult('success', `✅ ${data.message}`);
+                shutdownCamera();
+                previewBox.style.display = 'none';
+                btnStart.style.display = 'none';
+                btnOpenCam.innerHTML = '<i class="bi bi-camera-video me-2"></i>Open Camera';
+                // Refresh the registered users table and untrained panel
+                setTimeout(() => { location.reload(); }, 1800);
+            } else {
+                showResult('danger', `❌ ${data.error}`);
+                btnStart.style.display = 'block';
+                btnCancel.style.display = 'none';
+            }
+        } catch (e) {
+            progressWrap.style.display = 'none';
+            btnOpenCam.disabled = false;
+            showResult('danger', '❌ Network error during registration. Please try again.');
+            btnStart.style.display = 'block';
+            btnCancel.style.display = 'none';
+        }
+    }
+
+    // Stop camera when switching tab or leaving page
+    document.getElementById('tab-upload').addEventListener('click', shutdownCamera);
+    window.addEventListener('beforeunload', shutdownCamera);
+</script>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- Train Model Panel                                       -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="container-fluid px-4 pb-4">
+    <div class="card" id="train-panel">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-semibold">
+                <i class="bi bi-cpu-fill me-2 text-warning"></i>Train Model
+            </h6>
+            <span class="badge bg-warning text-dark" id="untrained-badge">Loading…</span>
+        </div>
+        <div class="card-body">
+
+            <!-- Info banner -->
+            <div class="alert alert-info d-flex align-items-start gap-2 py-2 mb-3">
+                <i class="bi bi-info-circle-fill mt-1"></i>
+                <div>
+                    <strong>How it works:</strong> After capturing photos, users are listed here as
+                    <em>untrained</em> — they won't be recognised yet.
+                    Click <strong>Train Model</strong> to process all their photos and activate recognition.
+                </div>
+            </div>
+
+            <!-- Train result -->
+            <div id="train-result" class="alert d-none mb-3" role="alert"></div>
+
+            <!-- Untrained users list -->
+            <div id="untrained-list" class="mb-3">
+                <p class="text-muted"><i class="bi bi-arrow-clockwise me-1"></i>Loading untrained users…</p>
+            </div>
+
+            <!-- Train button -->
+            <button id="btn-train" class="btn btn-warning fw-semibold px-4" disabled>
+                <i class="bi bi-cpu me-2"></i>Train Model
+            </button>
+            <div id="train-spinner" class="d-none mt-3">
+                <div class="d-flex align-items-center gap-2 text-warning">
+                    <div class="spinner-border spinner-border-sm"></div>
+                    <span id="train-status">Encoding faces… this may take a minute.</span>
+                </div>
+                <div class="progress mt-2" style="height:8px;border-radius:8px;">
+                    <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated" style="width:100%;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ── Train Model panel ─────────────────────────────────────────────
+    async function loadUntrainedUsers() {
+        const list = document.getElementById('untrained-list');
+        const badge = document.getElementById('untrained-badge');
+        const btnTr = document.getElementById('btn-train');
+        try {
+            const resp = await fetch('/untrained_users');
+            const data = await resp.json();
+            const users = data.users || [];
+            badge.textContent = users.length + ' untrained';
+            badge.className = users.length > 0
+                ? 'badge bg-warning text-dark'
+                : 'badge bg-success';
+
+            if (users.length === 0) {
+                list.innerHTML = `
+                <div class="text-center text-muted py-3">
+                    <i class="bi bi-check-circle-fill text-success fs-4 d-block mb-1"></i>
+                    All registered users are already trained. Nothing to do!
+                </div>`;
+                btnTr.disabled = true;
+            } else {
+                let html = '<div class="table-responsive"><table class="table table-sm table-hover mb-0">';
+                html += '<thead><tr><th>Photo</th><th>Name</th><th>Email</th><th>Registered</th></tr></thead><tbody>';
+                users.forEach(u => {
+                    const img = u.photo_path
+                        ? `<img src="/static/${u.photo_path}" class="rounded-circle"
+                           style="width:32px;height:32px;object-fit:cover;">`
+                        : '<i class="bi bi-person-circle fs-5 text-muted"></i>';
+                    html += `<tr>
+                    <td>${img}</td>
+                    <td class="fw-medium">${u.name}</td>
+                    <td class="text-muted">${u.email || '—'}</td>
+                    <td><small class="text-muted">${u.registered_date}</small></td>
+                </tr>`;
+                });
+                html += '</tbody></table></div>';
+                list.innerHTML = html;
+                btnTr.disabled = false;
+            }
+        } catch (e) {
+            list.innerHTML = '<p class="text-danger">Failed to load untrained users.</p>';
+        }
+    }
+
+    document.getElementById('btn-train').addEventListener('click', async () => {
+        const btnTr = document.getElementById('btn-train');
+        const spinner = document.getElementById('train-spinner');
+        const result = document.getElementById('train-result');
+        const status = document.getElementById('train-status');
+
+        btnTr.disabled = true;
+        spinner.classList.remove('d-none');
+        result.className = 'alert d-none';
+        status.textContent = 'Encoding faces from all untrained users… this may take a minute.';
+
+        try {
+            const resp = await fetch('/train_model', { method: 'POST' });
+            const data = await resp.json();
+
+            spinner.classList.add('d-none');
+
+            if (data.success) {
+                result.className = 'alert alert-success d-block';
+                result.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>${data.message}`;
+                await loadUntrainedUsers();   // refresh the list
+            } else {
+                result.className = 'alert alert-danger d-block';
+                result.innerHTML = `<i class="bi bi-x-circle-fill me-2"></i>${data.error}`;
+                btnTr.disabled = false;
+            }
+        } catch (e) {
+            spinner.classList.add('d-none');
+            result.className = 'alert alert-danger d-block';
+            result.textContent = '❌ Network error. Please try again.';
+            btnTr.disabled = false;
+        }
+    });
+
+    // Load on page ready
+    document.addEventListener('DOMContentLoaded', loadUntrainedUsers);
+</script>
+{% endblock %}

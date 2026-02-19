@@ -1,3 +1,221 @@
-hi this is just for first commit
-this is the second commit
-this is for test
+================================================================================
+                        [COLLEGE NAME]
+                   [COLLEGE ADDRESS & CITY]
+              (Affiliated to [University Name])
+================================================================================
+
+
+                      A PROJECT REPORT ON
+
+          "AI FACE RECOGNITION AND MONITORING SYSTEM"
+
+        Submitted in partial fulfillment of the requirements
+             for the award of the degree of
+
+              BACHELOR OF COMPUTER APPLICATIONS (BCA)
+
+                      Submitted By:
+                   [Student Name]
+                   Roll No: [XXXXXX]
+                   BCA - 6th Semester
+
+                     Under the Guidance of:
+                  [Guide Name], [Designation]
+                  Department of Computer Applications
+
+                   Academic Year: 2025-2026
+
+================================================================================
+
+
+================================================================================
+                         CERTIFICATE
+================================================================================
+
+This is to certify that the project work entitled "AI FACE RECOGNITION AND
+MONITORING SYSTEM" submitted by [Student Name], Roll No. [XXXXXX], is a
+bonafide work carried out by him/her in partial fulfillment of the requirements
+for the award of the degree of Bachelor of Computer Applications (BCA) from
+[University Name] during the academic year 2025-2026.
+
+This project has not been submitted to any other university or institution
+for the award of any degree or diploma.
+
+
+Project Guide:                              Head of Department:
+[Guide Name]                                [HOD Name]
+[Designation]                               Dept. of Computer Applications
+
+
+Date: _______________
+Place: _______________
+
+                                            Principal:
+                                            [Principal Name]
+                                            [College Name]
+
+
+================================================================================
+                       DECLARATION
+================================================================================
+
+I hereby declare that the project work entitled "AI FACE RECOGNITION AND
+MONITORING SYSTEM" submitted to [University Name] in partial fulfillment
+of the requirements for the award of the degree of Bachelor of Computer
+Applications (BCA) is a record of original work done by me under the
+supervision and guidance of [Guide Name], [Designation], Department of
+Computer Applications, [College Name].
+
+This project has not been submitted to any other university or institution
+for the award of any degree or diploma.
+
+
+Place: _______________
+Date: _______________
+                                            [Student Name]
+                                            Roll No: [XXXXXX]
+
+
+================================================================================
+                     ACKNOWLEDGEMENT
+================================================================================
+
+I would like to express my sincere gratitude to all those who helped me
+in completing this project successfully.
+
+First and foremost, I would like to thank the Almighty for giving me the
+strength, knowledge, and opportunity to undertake this project and complete
+it successfully.
+
+I express my heartfelt thanks to our Principal, [Principal Name], for
+providing all necessary facilities and support during the project.
+
+I am highly indebted to my project guide, [Guide Name], [Designation],
+Department of Computer Applications, for providing constant guidance,
+valuable suggestions, and encouragement throughout the project.
+
+I extend my gratitude to Prof. [HOD Name], Head of the Department of
+Computer Applications, for the support and motivation.
+
+I also take this opportunity to thank all the faculty members of the
+Department of Computer Applications for their generous help and cooperation
+during the project.
+
+Finally, I thank my parents, family members, and friends who supported me
+throughout this project.
+
+
+                                            [Student Name]
+                                            Roll No: [XXXXXX]
+
+
+================================================================================
+                         ABSTRACT
+================================================================================
+
+The "AI Face Recognition and Monitoring System" is a real-time,
+intelligent surveillance and attendance management solution developed using
+Python and modern machine learning libraries. In today's world, security
+and efficient monitoring are critical needs for educational institutions,
+corporate offices, and public spaces. Traditional manual methods of
+attendance tracking and security monitoring are time-consuming, error-prone,
+and inefficient.
+
+This project addresses these challenges by implementing a face recognition
+system powered by computer vision and deep learning techniques. The system
+uses OpenCV for real-time video capture and image processing, the
+face_recognition library (built on dlib's state-of-the-art deep learning
+model) for accurate face detection and identification, and a Flask-based
+web interface for user interaction and monitoring.
+
+A key highlight of the system is its robust two-step face registration
+workflow: the administrator captures 50 photos of a new user directly
+through the browser's live camera feed (using the browser-native
+getUserMedia API), and those photos are saved to disk without immediately
+impacting recognition. The admin can then review all unregistered users in
+a dedicated "Train Model" panel and trigger model training with a single
+click. Training processes all saved photos, computes an averaged
+128-dimensional face encoding for each user, and updates the recognition
+model — resulting in significantly higher accuracy than single-photo
+registration.
+
+Key features of the system include:
+  - Real-time face detection and recognition from live camera feeds
+  - Browser-native live camera preview during face registration
+    (no server-side camera conflict; works over localhost/HTTPS)
+  - Multi-photo capture: 50 frames captured automatically at 350ms
+    intervals with a real-time progress bar and thumbnail preview strip
+  - Two-step training workflow: capture photos first, train the model
+    separately via the dedicated Train Model panel
+  - Untrained user list showing all users pending model training
+  - Averaged face encodings from multiple samples for improved accuracy
+  - Automated attendance logging with timestamps
+  - Web-based dashboard for monitoring and report generation
+  - Attendance history and analytics
+  - Alert system for unrecognized faces (intrusion detection)
+  - Interactive alerts page with filter buttons (All/Unreviewed/Reviewed),
+    hover zoom, and a full-screen lightbox modal with image download
+  - CSV/Excel export of attendance reports
+  - Compatibility fix for Python 3.14 (pkg_resources replacement)
+
+The system achieves high recognition accuracy using averaged 128-dimensional
+face encodings trained from 50 sample photos per user, and supports multiple
+camera feeds. It is designed to be cost-effective, scalable, and easy to
+deploy.
+
+Keywords: Face Recognition, Computer Vision, OpenCV, Deep Learning,
+          Attendance System, Python, Flask, Real-time Monitoring,
+          getUserMedia, Multi-sample Training
+
+
+================================================================================
+                     TABLE OF CONTENTS
+================================================================================
+
+Chapter 1: INTRODUCTION
+    1.1  Introduction
+    1.2  Problem Statement
+    1.3  Objectives of the Project
+    1.4  Scope of the Project
+    1.5  Organization of the Report
+
+Chapter 2: LITERATURE REVIEW / SYSTEM ANALYSIS
+    2.1  Existing System
+    2.2  Proposed System
+    2.3  Feasibility Study
+    2.4  Literature Survey
+
+Chapter 3: SYSTEM REQUIREMENTS
+    3.1  Hardware Requirements
+    3.2  Software Requirements
+    3.3  Technology Stack
+
+Chapter 4: SYSTEM DESIGN
+    4.1  System Architecture
+    4.2  Data Flow Diagrams (DFD)
+    4.3  Entity-Relationship (ER) Diagram
+    4.4  Use Case Diagram
+    4.5  Module Description
+
+Chapter 5: IMPLEMENTATION
+    5.1  Implementation Overview
+    5.2  Core Modules and Code
+    5.3  Database Design
+    5.4  User Interface Design
+
+Chapter 6: TESTING
+    6.1  Testing Strategy
+    6.2  Test Cases
+    6.3  Testing Results
+
+Chapter 7: SCREENSHOTS / OUTPUT
+
+Chapter 8: CONCLUSION AND FUTURE SCOPE
+    8.1  Conclusion
+    8.2  Future Scope
+
+Chapter 9: REFERENCES / BIBLIOGRAPHY
+
+Chapter 10: APPENDIX
+    10.1  Source Code (Key Modules)
+    10.2  Glossary
