@@ -184,6 +184,7 @@ class FaceRecognitionEngine:
         Generator that yields MJPEG frames from the camera.
         Performs face recognition on each frame and optionally
         marks attendance and logs unknown faces.
+        Supports multiple faces simultaneously.
         """
         self.camera = cv2.VideoCapture(0)
 
@@ -193,7 +194,10 @@ class FaceRecognitionEngine:
 
         self.is_running = True
         frame_count = 0
-        unknown_cooldown = {}  # prevent spamming unknown face saves
+        # Cache last recognition results so boxes are drawn on EVERY frame
+        cached_results = []
+        # Cooldown: key = rounded face-centre bucket, value = last-saved datetime
+        unknown_cooldown = {}
 
         try:
             while self.is_running:
@@ -201,37 +205,42 @@ class FaceRecognitionEngine:
                 if not success:
                     break
 
-                # Process every 3rd frame for performance
+                # Run recognition every 3rd frame for performance;
+                # reuse cached_results on the other frames so boxes always show
                 if frame_count % 3 == 0:
-                    results = self.recognize_faces(frame)
+                    cached_results = self.recognize_faces(frame)
 
-                    for res in results:
+                    for res in cached_results:
                         if res['name'] != "Unknown" and db_handler:
-                            # Mark attendance for recognized faces
+                            # Mark attendance for recognised faces
                             db_handler.mark_attendance(
                                 res['name'], res.get('user_id')
                             )
                         elif res['name'] == "Unknown" and db_handler and unknown_faces_dir:
-                            # Save unknown face (with cooldown)
+                            # Use a stable bucket key (rounded to nearest 50px)
+                            # so minor jitter doesn't create duplicate saves
+                            top, right, bottom, left = res['location']
+                            cx = ((left + right) // 2) // 50
+                            cy = ((top + bottom) // 2) // 50
+                            cooldown_key = f"{cx}_{cy}"
                             now = datetime.now()
-                            cooldown_key = f"{res['location']}"
-                            if cooldown_key not in unknown_cooldown or \
-                               (now - unknown_cooldown[cooldown_key]).seconds > 30:
+                            last_saved = unknown_cooldown.get(cooldown_key)
+                            if last_saved is None or (now - last_saved).total_seconds() > 30:
                                 unknown_cooldown[cooldown_key] = now
-                                timestamp = now.strftime('%Y%m%d_%H%M%S')
+                                timestamp = now.strftime('%Y%m%d_%H%M%S_%f')[:19]
                                 filename = f"unknown_{timestamp}.jpg"
+                                os.makedirs(unknown_faces_dir, exist_ok=True)
                                 filepath = os.path.join(unknown_faces_dir, filename)
-                                top, right, bottom, left = res['location']
-                                face_img = frame[max(0, top-20):bottom+20,
-                                                  max(0, left-20):right+20]
+                                face_img = frame[max(0, top - 20):bottom + 20,
+                                                  max(0, left - 20):right + 20]
                                 if face_img.size > 0:
                                     cv2.imwrite(filepath, face_img)
                                     db_handler.log_unknown_face(
                                         f"unknown_faces/{filename}"
                                     )
 
-                    frame = self.draw_results(frame, results)
-
+                # Always draw cached results so boxes are visible on every frame
+                frame = self.draw_results(frame, cached_results)
                 frame_count += 1
 
                 # Add timestamp overlay

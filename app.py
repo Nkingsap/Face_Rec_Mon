@@ -194,11 +194,52 @@ def delete_alert(log_id):
 @app.route('/delete_user/<int:user_id>')
 @login_required
 def delete_user(user_id):
-    """Delete a registered user."""
+    """Permanently delete a registered user, their photos, and their face encoding."""
+    import shutil
+
+    # Fetch user info BEFORE deleting from DB
+    user = db.get_user_by_id(user_id)
+    user_name = user['name'] if user else None
+    photo_dir = user['photo_dir'] if user else None
+    photo_path = user['photo_path'] if user else None
+
+    # 1. Remove from database
     db.delete_user(user_id)
-    # Reload encodings
-    engine.load_encodings()
-    flash('User deleted.', 'info')
+
+    # 2. Remove the user's face encoding(s) from the in-memory lists and save
+    if user_name and user_name in engine.known_names:
+        indices_to_remove = [
+            i for i, n in enumerate(engine.known_names) if n == user_name
+        ]
+        for i in sorted(indices_to_remove, reverse=True):
+            engine.known_encodings.pop(i)
+            engine.known_names.pop(i)
+            engine.known_ids.pop(i)
+        engine.save_encodings()
+        print(f"[INFO] Removed encoding(s) for '{user_name}' and saved updated pickle.")
+    else:
+        # Still reload to stay in sync
+        engine.load_encodings()
+
+    # 3. Delete the photo folder/file from disk permanently
+    static_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    deleted_something = False
+    if photo_dir:
+        # photo_dir is stored relative to static/  e.g. "registered_faces/John"
+        full_dir = os.path.join(static_base, photo_dir)
+        if os.path.isdir(full_dir):
+            import shutil
+            shutil.rmtree(full_dir)
+            deleted_something = True
+            print(f"[INFO] Deleted photo folder: {full_dir}")
+    if not deleted_something and photo_path:
+        # photo_path is stored relative to static/  e.g. "registered_faces/John/img.jpg"
+        full_file = os.path.join(static_base, photo_path)
+        if os.path.isfile(full_file):
+            os.remove(full_file)
+            print(f"[INFO] Deleted photo file: {full_file}")
+
+    flash(f'User "{user_name or user_id}" permanently deleted.', 'info')
     return redirect(url_for('register'))
 
 

@@ -141,6 +141,15 @@ class DatabaseHandler:
         conn.close()
         return user
 
+    def get_user_by_id(self, user_id):
+        """Get user by ID."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE user_id=?', (user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        return user
+
     def get_user_count(self):
         """Get total number of registered users."""
         conn = self.get_connection()

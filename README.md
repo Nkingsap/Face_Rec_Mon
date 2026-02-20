@@ -23,9 +23,13 @@ Real-time face recognition and attendance tracking built with Python and Flask.
 - 🔐 Admin login with hashed passwords
 
 ---
+### 1. Install System Dependencies (Linux)
 
+```bash
+sudo apt install cmake g++ libopenblas-dev liblapack-dev libx11-dev
+```
 
-### 1. Clone & install
+### 2. Clone & install
 
 ```bash
 git clone https://github.com/Nkingsap/Face_Rec_Mon.git
