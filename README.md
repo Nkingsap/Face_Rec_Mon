@@ -124,5 +124,6 @@ Face_Rec_Mon/
 ---
 
 <div align="center">
-Made with ❤️ using Python, Flask, OpenCV & dlib
+Who is Hero?
+Nking is Hero
 </div>
