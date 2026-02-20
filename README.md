@@ -24,18 +24,11 @@ Real-time face recognition and attendance tracking built with Python and Flask.
 
 ---
 
-## Setup
 
-### 1. Install system dependencies (Linux)
-
-```bash
-sudo apt install cmake g++ libopenblas-dev liblapack-dev libx11-dev
-```
-
-### 2. Clone & install
+### 1. Clone & install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Face_Rec_Mon.git
+git clone https://github.com/Nkingsap/Face_Rec_Mon.git
 cd Face_Rec_Mon
 python -m venv venv
 source venv/bin/activate
@@ -88,15 +81,37 @@ After registering, the person won't be recognized yet.
 
 ```
 Face_Rec_Mon/
-├── app.py                 # Flask app & routes
-├── face_rec_engine.py     # Face recognition core
-├── attendance_manager.py  # Attendance logging
-├── config.py              # Settings (paths, tolerances)
+│
+├── app.py                    # Main Flask app — all routes (login, register,
+│                             #   attendance, alerts, video feed, train model)
+├── face_rec_engine.py        # Core recognition engine — loads encodings,
+│                             #   detects faces, draws overlays, streams MJPEG
+├── attendance_manager.py     # Marks attendance in DB, prevents duplicate entries
+├── config.py                 # Central config — file paths, tolerance, model type
+├── requirements.txt          # Python dependencies
+│
 ├── database/
-│   └── db_handler.py      # SQLite operations
-├── static/                # CSS, JS, face photos
-├── templates/             # HTML pages
-└── requirements.txt
+│   ├── db_handler.py         # All SQLite queries (users, attendance, alerts, admin)
+│   └── database.db           # SQLite DB — auto-created on first run
+│
+├── encodings/
+│   └── face_encodings.pkl    # Saved face vectors — auto-created after training
+│
+├── static/
+│   ├── css/
+│   │   └── style.css         # App stylesheet
+│   ├── registered_faces/     # Captured photos used for training (50 per person)
+│   └── unknown_faces/        # Snapshots of unrecognized faces (alert images)
+│
+├── templates/
+│   ├── base.html             # Shared layout with sidebar navigation
+│   ├── login.html            # Admin login page
+│   ├── dashboard.html        # Overview — stats, recent attendance, unknown alerts
+│   ├── register.html         # Face registration + Train Model panel
+│   ├── attendance.html       # Attendance records with date/name filter & CSV export
+│   └── alerts.html           # Unknown face alerts with lightbox viewer
+│
+└── reports/                  # CSV exports saved here
 ```
 
 ---
