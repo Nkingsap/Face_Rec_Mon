@@ -105,7 +105,6 @@ Face_Rec_Mon/
 
 - **dlib** takes 5–15 min to compile on first install
 - For better accuracy (GPU required), switch model to `cnn` in `config.py`
-- Run `python inspect_encodings.py` to view stored face encodings
 
 ---
 
