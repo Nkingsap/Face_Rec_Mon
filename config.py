@@ -35,6 +35,11 @@ FRAME_RESIZE_FACTOR = 0.5  # Resize frames for processing (was 0.25, higher = mo
 NUM_JITTERS = 3  # Re-sample face encoding N times and average (higher = slower but better)
 NUM_ENCODINGS_PER_PERSON = 5  # Store top N diverse encodings per person
 
+# Unknown face throttle settings
+UNKNOWN_COOLDOWN_SECONDS = 300  # Seconds between saves for the same spatial bucket (5 min)
+UNKNOWN_BUCKET_SIZE = 80        # Spatial bucket granularity in px (higher = less sensitive to movement)
+UNKNOWN_MIN_FACE_SIZE = 60      # Min face bbox dimension in px (skip tiny/far-away detections)
+
 # Attendance settings
 LATE_THRESHOLD_HOUR = 9   # Hour after which attendance is "Late"
 LATE_THRESHOLD_MINUTE = 30

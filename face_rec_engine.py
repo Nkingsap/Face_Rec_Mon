@@ -6,7 +6,9 @@ import os
 import pickle
 import cv2
 import numpy as np
-from config import FRAME_RESIZE_FACTOR, NUM_JITTERS
+from config import (FRAME_RESIZE_FACTOR, NUM_JITTERS,
+                    UNKNOWN_COOLDOWN_SECONDS, UNKNOWN_BUCKET_SIZE,
+                    UNKNOWN_MIN_FACE_SIZE, RECOGNITION_TOLERANCE)
 from datetime import datetime
 
 # Try to import face_recognition; provide fallback if unavailable
@@ -154,7 +156,8 @@ class FaceRecognitionEngine:
                 'name': name,
                 'user_id': user_id,
                 'location': (top, right, bottom, left),
-                'confidence': confidence
+                'confidence': confidence,
+                'encoding': encoding  # raw encoding for dedup
             })
 
         return results
@@ -209,8 +212,15 @@ class FaceRecognitionEngine:
         frame_count = 0
         # Cache last recognition results so boxes are drawn on EVERY frame
         cached_results = []
-        # Cooldown: key = rounded face-centre bucket, value = last-saved datetime
+        # ── Unknown-face throttle state ──────────────────
+        # Spatial cooldown: bucket key → last-saved datetime
         unknown_cooldown = {}
+        # Encoding ring-buffer for deduplication (last N saved encodings)
+        _RING_SIZE = 20
+        recent_unknown_encs = []
+        # Global rate cap: timestamps of saves in the last minute
+        save_timestamps = []
+        _MAX_SAVES_PER_MIN = 3
 
         try:
             while self.is_running:
@@ -230,27 +240,63 @@ class FaceRecognitionEngine:
                                 res['name'], res.get('user_id')
                             )
                         elif res['name'] == "Unknown" and db_handler and unknown_faces_dir:
-                            # Use a stable bucket key (rounded to nearest 50px)
-                            # so minor jitter doesn't create duplicate saves
                             top, right, bottom, left = res['location']
-                            cx = ((left + right) // 2) // 50
-                            cy = ((top + bottom) // 2) // 50
+
+                            # ── Filter 1: minimum face size ─────────
+                            face_w = right - left
+                            face_h = bottom - top
+                            if face_w < UNKNOWN_MIN_FACE_SIZE or face_h < UNKNOWN_MIN_FACE_SIZE:
+                                continue  # too small / too far away
+
+                            # ── Filter 2: spatial-bucket cooldown ───
+                            bucket = UNKNOWN_BUCKET_SIZE
+                            cx = ((left + right) // 2) // bucket
+                            cy = ((top + bottom) // 2) // bucket
                             cooldown_key = f"{cx}_{cy}"
                             now = datetime.now()
                             last_saved = unknown_cooldown.get(cooldown_key)
-                            if last_saved is None or (now - last_saved).total_seconds() > 30:
-                                unknown_cooldown[cooldown_key] = now
-                                timestamp = now.strftime('%Y%m%d_%H%M%S_%f')[:19]
-                                filename = f"unknown_{timestamp}.jpg"
-                                os.makedirs(unknown_faces_dir, exist_ok=True)
-                                filepath = os.path.join(unknown_faces_dir, filename)
-                                face_img = frame[max(0, top - 20):bottom + 20,
-                                                  max(0, left - 20):right + 20]
-                                if face_img.size > 0:
-                                    cv2.imwrite(filepath, face_img)
-                                    db_handler.log_unknown_face(
-                                        f"unknown_faces/{filename}"
-                                    )
+                            if last_saved is not None and (now - last_saved).total_seconds() < UNKNOWN_COOLDOWN_SECONDS:
+                                continue  # same spot, still in cooldown
+
+                            # ── Filter 3: encoding deduplication ────
+                            encoding = res.get('encoding')
+                            if encoding is not None and len(recent_unknown_encs) > 0:
+                                dists = face_recognition.face_distance(
+                                    recent_unknown_encs, encoding
+                                )
+                                if np.min(dists) <= RECOGNITION_TOLERANCE:
+                                    # Same unknown person already saved recently
+                                    unknown_cooldown[cooldown_key] = now
+                                    continue
+
+                            # ── Filter 4: global rate cap ───────────
+                            save_timestamps = [
+                                t for t in save_timestamps
+                                if (now - t).total_seconds() < 60
+                            ]
+                            if len(save_timestamps) >= _MAX_SAVES_PER_MIN:
+                                continue  # hit per-minute cap
+
+                            # ── All filters passed — save ───────────
+                            unknown_cooldown[cooldown_key] = now
+                            save_timestamps.append(now)
+                            if encoding is not None:
+                                recent_unknown_encs.append(encoding)
+                                if len(recent_unknown_encs) > _RING_SIZE:
+                                    recent_unknown_encs.pop(0)
+
+                            timestamp = now.strftime('%Y%m%d_%H%M%S_%f')[:19]
+                            filename = f"unknown_{timestamp}.jpg"
+                            os.makedirs(unknown_faces_dir, exist_ok=True)
+                            filepath = os.path.join(unknown_faces_dir, filename)
+                            face_img = frame[max(0, top - 20):bottom + 20,
+                                              max(0, left - 20):right + 20]
+                            if face_img.size > 0:
+                                cv2.imwrite(filepath, face_img)
+                                db_handler.log_unknown_face(
+                                    f"unknown_faces/{filename}"
+                                )
+                                print(f"[UNKNOWN] Saved {filename}")
 
                 # Always draw cached results so boxes are visible on every frame
                 frame = self.draw_results(frame, cached_results)
