@@ -28,9 +28,12 @@ UNKNOWN_FACES_DIR = os.path.join(BASE_DIR, 'static', 'unknown_faces')
 REPORTS_DIR = os.path.join(BASE_DIR, 'reports')
 
 # Face recognition settings
-RECOGNITION_TOLERANCE = 0.6  # Lower = more strict
-MODEL = 'hog'  # 'hog' (CPU, faster) or 'cnn' (GPU, more accurate)
-FRAME_RESIZE_FACTOR = 0.25  # Resize frames for faster processing
+RECOGNITION_TOLERANCE = 0.4  # Lower = more strict. 0.4 = 60% confidence threshold
+MODEL = 'hog'  # 'hog' (CPU, faster) or 'cnn' (GPU, more accurate) — used for live feed
+TRAIN_MODEL = 'hog'  # 'hog' for CPU, 'cnn' only if you have CUDA GPU
+FRAME_RESIZE_FACTOR = 0.5  # Resize frames for processing (was 0.25, higher = more accurate)
+NUM_JITTERS = 3  # Re-sample face encoding N times and average (higher = slower but better)
+NUM_ENCODINGS_PER_PERSON = 5  # Store top N diverse encodings per person
 
 # Attendance settings
 LATE_THRESHOLD_HOUR = 9   # Hour after which attendance is "Late"

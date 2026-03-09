@@ -28,6 +28,9 @@ class DatabaseHandler:
                 user_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 email TEXT,
+                roll_no TEXT,
+                department TEXT,
+                semester TEXT,
                 photo_path TEXT,
                 photo_dir TEXT,
                 trained INTEGER DEFAULT 0,
@@ -41,6 +44,12 @@ class DatabaseHandler:
             cursor.execute('ALTER TABLE users ADD COLUMN trained INTEGER DEFAULT 0')
         if 'photo_dir' not in existing_cols:
             cursor.execute('ALTER TABLE users ADD COLUMN photo_dir TEXT')
+        if 'roll_no' not in existing_cols:
+            cursor.execute('ALTER TABLE users ADD COLUMN roll_no TEXT')
+        if 'department' not in existing_cols:
+            cursor.execute('ALTER TABLE users ADD COLUMN department TEXT')
+        if 'semester' not in existing_cols:
+            cursor.execute('ALTER TABLE users ADD COLUMN semester TEXT')
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS attendance (
@@ -93,13 +102,15 @@ class DatabaseHandler:
 
     # ── User operations ───────────────────────────────────────────
 
-    def add_user(self, name, email, photo_path, photo_dir=None, trained=0):
+    def add_user(self, name, email, photo_path, photo_dir=None, trained=0,
+                 roll_no=None, department=None, semester=None):
         """Add a new registered user."""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            'INSERT INTO users (name, email, photo_path, photo_dir, trained) VALUES (?, ?, ?, ?, ?)',
-            (name, email, photo_path, photo_dir, trained)
+            'INSERT INTO users (name, email, photo_path, photo_dir, trained, roll_no, department, semester) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (name, email, photo_path, photo_dir, trained, roll_no, department, semester)
         )
         user_id = cursor.lastrowid
         conn.commit()
@@ -164,8 +175,48 @@ class DatabaseHandler:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM users WHERE user_id=?', (user_id,))
+        # Reset autoincrement so IDs fill gaps
+        cursor.execute(
+            "UPDATE sqlite_sequence SET seq = "
+            "(SELECT COALESCE(MAX(user_id), 0) FROM users) "
+            "WHERE name = 'users'"
+        )
         conn.commit()
         conn.close()
+
+    def update_user(self, user_id, roll_no=None, department=None, semester=None,
+                    name=None, email=None):
+        """Update editable student fields for a user."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        fields = []
+        values = []
+        if roll_no is not None:
+            fields.append('roll_no=?')
+            values.append(roll_no)
+        if department is not None:
+            fields.append('department=?')
+            values.append(department)
+        if semester is not None:
+            fields.append('semester=?')
+            values.append(semester)
+        if name is not None:
+            fields.append('name=?')
+            values.append(name)
+        if email is not None:
+            fields.append('email=?')
+            values.append(email)
+        if not fields:
+            conn.close()
+            return False
+        values.append(user_id)
+        cursor.execute(
+            f'UPDATE users SET {", ".join(fields)} WHERE user_id=?',
+            tuple(values)
+        )
+        conn.commit()
+        conn.close()
+        return True
 
     # ── Attendance operations ─────────────────────────────────────
 
@@ -307,3 +358,23 @@ class DatabaseHandler:
         conn.commit()
         conn.close()
         return image_path
+
+    def bulk_delete_alerts(self, log_ids):
+        """Delete multiple alert records. Returns list of image_paths."""
+        if not log_ids:
+            return []
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        placeholders = ','.join('?' for _ in log_ids)
+        cursor.execute(
+            f'SELECT image_path FROM unknown_faces WHERE log_id IN ({placeholders})',
+            log_ids
+        )
+        image_paths = [row['image_path'] for row in cursor.fetchall() if row['image_path']]
+        cursor.execute(
+            f'DELETE FROM unknown_faces WHERE log_id IN ({placeholders})',
+            log_ids
+        )
+        conn.commit()
+        conn.close()
+        return image_paths

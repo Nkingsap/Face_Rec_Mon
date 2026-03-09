@@ -6,6 +6,7 @@ import os
 import pickle
 import cv2
 import numpy as np
+from config import FRAME_RESIZE_FACTOR, NUM_JITTERS
 from datetime import datetime
 
 # Try to import face_recognition; provide fallback if unavailable
@@ -26,6 +27,8 @@ class FaceRecognitionEngine:
         self.encodings_path = encodings_path
         self.tolerance = tolerance
         self.model = model  # 'hog' for CPU, 'cnn' for GPU
+        self.resize_factor = FRAME_RESIZE_FACTOR
+        self.scale_back = int(1.0 / FRAME_RESIZE_FACTOR)
         self.known_encodings = []
         self.known_names = []
         self.known_ids = []
@@ -74,7 +77,9 @@ class FaceRecognitionEngine:
 
         try:
             image = face_recognition.load_image_file(image_path)
-            encodings = face_recognition.face_encodings(image)
+            encodings = face_recognition.face_encodings(
+                image, num_jitters=NUM_JITTERS
+            )
 
             if len(encodings) == 0:
                 print(f"[WARNING] No face detected in {image_path}")
@@ -100,9 +105,15 @@ class FaceRecognitionEngine:
         if not FACE_REC_AVAILABLE:
             return []
 
-        # Resize for faster processing
-        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-        rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+        # Resize for faster processing (configurable factor)
+        fx = self.resize_factor
+        small_frame = cv2.resize(frame, (0, 0), fx=fx, fy=fx)
+
+        # Histogram equalization for better lighting handling
+        yuv = cv2.cvtColor(small_frame, cv2.COLOR_BGR2YUV)
+        yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])
+        preprocessed = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
+        rgb_frame = cv2.cvtColor(preprocessed, cv2.COLOR_BGR2RGB)
 
         # Detect faces
         face_locations = face_recognition.face_locations(rgb_frame, model=self.model)
@@ -115,27 +126,29 @@ class FaceRecognitionEngine:
             user_id = None
 
             if len(self.known_encodings) > 0:
-                matches = face_recognition.compare_faces(
-                    self.known_encodings, encoding, tolerance=self.tolerance
-                )
+                # Compare against all stored encodings
                 face_distances = face_recognition.face_distance(
                     self.known_encodings, encoding
                 )
 
-                if True in matches:
-                    best_match_idx = np.argmin(face_distances)
-                    if matches[best_match_idx]:
-                        name = self.known_names[best_match_idx]
-                        confidence = round(1.0 - face_distances[best_match_idx], 2)
-                        if best_match_idx < len(self.known_ids):
-                            user_id = self.known_ids[best_match_idx]
+                # Find the best match (lowest distance)
+                best_match_idx = np.argmin(face_distances)
+                best_distance = face_distances[best_match_idx]
 
-            # Scale back coordinates (we resized by 0.25)
+                # Only accept if within tolerance
+                if best_distance <= self.tolerance:
+                    name = self.known_names[best_match_idx]
+                    confidence = round(1.0 - best_distance, 2)
+                    if best_match_idx < len(self.known_ids):
+                        user_id = self.known_ids[best_match_idx]
+
+            # Scale back coordinates based on resize factor
+            sb = self.scale_back
             top, right, bottom, left = location
-            top *= 4
-            right *= 4
-            bottom *= 4
-            left *= 4
+            top *= sb
+            right *= sb
+            bottom *= sb
+            left *= sb
 
             results.append({
                 'name': name,

@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 from config import (SECRET_KEY, DATABASE_PATH, ENCODINGS_FILE,
                     REGISTERED_FACES_DIR, UNKNOWN_FACES_DIR,
                     REPORTS_DIR, RECOGNITION_TOLERANCE, MODEL,
+                    TRAIN_MODEL, NUM_JITTERS, NUM_ENCODINGS_PER_PERSON,
                     DEBUG, HOST, PORT)
 from database.db_handler import DatabaseHandler
 from face_rec_engine import FaceRecognitionEngine, FACE_REC_AVAILABLE
@@ -103,6 +104,9 @@ def register():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip()
+        roll_no = request.form.get('roll_no', '').strip()
+        department = request.form.get('department', '').strip()
+        semester = request.form.get('semester', '').strip()
 
         if not name:
             flash('Name is required.', 'error')
@@ -125,7 +129,9 @@ def register():
             file.save(filepath)
 
             # Add user to database
-            user_id = db.add_user(name, email, f"registered_faces/{filename}")
+            user_id = db.add_user(name, email, f"registered_faces/{filename}",
+                                 roll_no=roll_no, department=department,
+                                 semester=semester)
 
             # Register face encoding
             if FACE_REC_AVAILABLE:
@@ -161,6 +167,14 @@ def attendance():
                            date_filter=date_filter or '')
 
 
+@app.route('/live_feed')
+@login_required
+def live_feed():
+    """Dedicated live feed page with face recognition."""
+    return render_template('live_feed.html',
+                           face_rec_available=FACE_REC_AVAILABLE)
+
+
 @app.route('/alerts')
 @login_required
 def alerts():
@@ -189,6 +203,31 @@ def delete_alert(log_id):
             os.remove(full_path)
     flash('Alert deleted.', 'info')
     return redirect(url_for('alerts'))
+
+
+@app.route('/bulk_delete_alerts', methods=['POST'])
+@login_required
+def bulk_delete_alerts():
+    """Delete multiple alerts and their image files."""
+    data = request.get_json()
+    if not data or 'ids' not in data:
+        return jsonify({'success': False, 'error': 'No IDs provided'}), 400
+
+    log_ids = [int(i) for i in data['ids']]
+    image_paths = db.bulk_delete_alerts(log_ids)
+
+    # Remove image files from disk
+    deleted_files = 0
+    for img_path in image_paths:
+        full_path = os.path.join('static', img_path)
+        if os.path.exists(full_path):
+            os.remove(full_path)
+            deleted_files += 1
+
+    return jsonify({
+        'success': True,
+        'message': f'Deleted {len(log_ids)} alert(s) and {deleted_files} image(s).'
+    })
 
 
 @app.route('/delete_user/<int:user_id>')
@@ -285,6 +324,9 @@ def register_camera():
 
     name   = data.get('name', '').strip()
     email  = data.get('email', '').strip()
+    roll_no = data.get('roll_no', '').strip()
+    department = data.get('department', '').strip()
+    semester = data.get('semester', '').strip()
     frames = data.get('frames', [])
 
     if not name:
@@ -322,7 +364,9 @@ def register_camera():
     # Add user to DB as UNTRAINED (trained=0)
     photo_dir_rel = f"registered_faces/{safe_name}"
     db.add_user(name, email, preview_path,
-                photo_dir=photo_dir_rel, trained=0)
+                photo_dir=photo_dir_rel, trained=0,
+                roll_no=roll_no, department=department,
+                semester=semester)
 
     return jsonify({
         'success': True,
@@ -340,97 +384,199 @@ def untrained_users():
     data  = [{'user_id': u['user_id'],
                'name':    u['name'],
                'email':   u['email'] or '',
+               'roll_no': u['roll_no'] or '',
+               'department': u['department'] or '',
+               'semester': u['semester'] or '',
                'photo_path': u['photo_path'] or '',
                'registered_date': u['registered_date']}
              for u in users]
     return jsonify({'users': data})
 
 
+@app.route('/edit_user/<int:user_id>', methods=['POST'])
+@login_required
+def edit_user(user_id):
+    """Update student info (roll_no, department, semester)."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data received'}), 400
+    success = db.update_user(
+        user_id,
+        roll_no=data.get('roll_no'),
+        department=data.get('department'),
+        semester=data.get('semester'),
+        name=data.get('name'),
+        email=data.get('email'),
+    )
+    if success:
+        return jsonify({'success': True, 'message': 'Student info updated.'})
+    return jsonify({'success': False, 'error': 'Nothing to update.'}), 400
+
+
 @app.route('/train_model', methods=['POST'])
 @login_required
 def train_model():
     """Encode faces for all untrained users and update the recognition model."""
+    print("\n" + "=" * 55)
+    print("[TRAIN] Training started")
+    print("=" * 55)
+
     if not FACE_REC_AVAILABLE:
+        print("[TRAIN] ERROR: face_recognition library not available")
         return jsonify({'success': False, 'error': 'Face recognition not available'}), 503
 
-    import cv2
-    import face_recognition as fr
+    try:
+        import cv2
+        import face_recognition as fr
+        import time
 
-    untrained = db.get_untrained_users()
-    if not untrained:
-        return jsonify({'success': False, 'error': 'No untrained users found.'}), 400
+        train_detect_model = TRAIN_MODEL
+        print(f"[TRAIN] Detection model: {train_detect_model}, "
+              f"num_jitters: {NUM_JITTERS}, "
+              f"encodings_per_person: {NUM_ENCODINGS_PER_PERSON}")
 
-    trained_names   = []
-    failed_names    = []
+        untrained = db.get_untrained_users()
+        if not untrained:
+            print("[TRAIN] No untrained users found.")
+            return jsonify({'success': False, 'error': 'No untrained users found.'}), 400
 
-    for user in untrained:
-        user_id   = user['user_id']
-        name      = user['name']
-        safe_name = name.replace(' ', '_')
-        photo_dir = os.path.join(REGISTERED_FACES_DIR, safe_name)
+        print(f"[TRAIN] Found {len(untrained)} untrained user(s)")
 
-        encodings_found = []
+        trained_names   = []
+        failed_names    = []
+        total_start = time.time()
 
-        # Try to read images from the person's folder
-        if os.path.isdir(photo_dir):
-            for fname in sorted(os.listdir(photo_dir)):
-                if not fname.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    continue
-                fpath = os.path.join(photo_dir, fname)
+        for user in untrained:
+            user_id   = user['user_id']
+            name      = user['name']
+            safe_name = name.replace(' ', '_')
+            photo_dir = os.path.join(REGISTERED_FACES_DIR, safe_name)
+
+            print(f"\n[TRAIN] --- Processing: {name} (ID: {user_id}) ---")
+            encodings_found = []
+            user_start = time.time()
+
+            if os.path.isdir(photo_dir):
+                image_files = [f for f in sorted(os.listdir(photo_dir))
+                               if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                print(f"[TRAIN] Found {len(image_files)} images in {photo_dir}")
+
+                for i, fname in enumerate(image_files):
+                    fpath = os.path.join(photo_dir, fname)
+                    try:
+                        img = cv2.imread(fpath)
+                        if img is None:
+                            print(f"[TRAIN]   [{i+1}/{len(image_files)}] {fname} - SKIP (unreadable)")
+                            continue
+                        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        locs = fr.face_locations(rgb, model=train_detect_model)
+                        if not locs:
+                            print(f"[TRAIN]   [{i+1}/{len(image_files)}] {fname} - no face detected")
+                            continue
+                        encs = fr.face_encodings(rgb, locs,
+                                                 num_jitters=NUM_JITTERS)
+                        if encs:
+                            encodings_found.append(encs[0])
+                            if (i + 1) % 10 == 0 or i == 0:
+                                print(f"[TRAIN]   [{i+1}/{len(image_files)}] {fname} - OK "
+                                      f"(total: {len(encodings_found)})")
+                    except Exception as e:
+                        print(f"[TRAIN]   [{i+1}/{len(image_files)}] {fname} - ERROR: {e}")
+            elif user['photo_path']:
+                fpath = os.path.join('static', user['photo_path'])
+                print(f"[TRAIN] Single photo fallback: {fpath}")
                 try:
                     img = cv2.imread(fpath)
-                    if img is None:
-                        continue
-                    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    locs = fr.face_locations(rgb)
-                    encs = fr.face_encodings(rgb, locs)
-                    if encs:
-                        encodings_found.append(encs[0])
+                    if img is not None:
+                        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        locs = fr.face_locations(rgb, model=train_detect_model)
+                        encs = fr.face_encodings(rgb, locs,
+                                                 num_jitters=NUM_JITTERS)
+                        if encs:
+                            encodings_found.extend(encs)
+                            print(f"[TRAIN] Single photo encoded OK")
+                        else:
+                            print(f"[TRAIN] Single photo - no face detected")
+                    else:
+                        print(f"[TRAIN] Single photo - could not read file")
                 except Exception as e:
-                    print(f"[WARN] Encoding {fname} failed: {e}")
-        elif user['photo_path']:
-            # Fallback: single uploaded photo
-            fpath = os.path.join('static', user['photo_path'])
-            try:
-                img = cv2.imread(fpath)
-                if img is not None:
-                    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    locs = fr.face_locations(rgb)
-                    encs = fr.face_encodings(rgb, locs)
-                    if encs:
-                        encodings_found.extend(encs)
-            except Exception as e:
-                print(f"[WARN] Single photo encoding failed for {name}: {e}")
+                    print(f"[TRAIN] Single photo encoding failed: {e}")
+            else:
+                print(f"[TRAIN] No photo_dir or photo_path for {name}")
 
-        if not encodings_found:
-            print(f"[WARN] No face found for {name}, skipping.")
-            failed_names.append(name)
-            continue
+            elapsed = time.time() - user_start
+            print(f"[TRAIN] {name}: {len(encodings_found)} encodings in {elapsed:.1f}s")
 
-        # Average all encodings → more robust single vector
-        avg_enc = np.mean(encodings_found, axis=0)
-        engine.known_encodings.append(avg_enc)
-        engine.known_names.append(name)
-        engine.known_ids.append(user_id)
-        db.mark_user_trained(user_id)
-        trained_names.append(f"{name} ({len(encodings_found)} samples)")
-        print(f"[INFO] Trained {name} with {len(encodings_found)} encodings.")
+            if not encodings_found:
+                print(f"[TRAIN] SKIPPING {name} - no faces detected")
+                failed_names.append(name)
+                continue
 
-    if not trained_names:
+            # Store top N most diverse encodings
+            n_keep = min(NUM_ENCODINGS_PER_PERSON, len(encodings_found))
+            if len(encodings_found) <= n_keep:
+                selected = encodings_found
+            else:
+                selected = [encodings_found[0]]
+                remaining = list(range(1, len(encodings_found)))
+                while len(selected) < n_keep and remaining:
+                    best_idx = None
+                    best_min_dist = -1
+                    for idx in remaining:
+                        min_dist = min(
+                            np.linalg.norm(
+                                encodings_found[idx] - s
+                            ) for s in selected
+                        )
+                        if min_dist > best_min_dist:
+                            best_min_dist = min_dist
+                            best_idx = idx
+                    selected.append(encodings_found[best_idx])
+                    remaining.remove(best_idx)
+
+            for enc in selected:
+                engine.known_encodings.append(enc)
+                engine.known_names.append(name)
+                engine.known_ids.append(user_id)
+
+            db.mark_user_trained(user_id)
+            trained_names.append(
+                f"{name} ({len(encodings_found)} samples → {len(selected)} encodings)"
+            )
+            print(f"[TRAIN] ✓ {name}: stored {len(selected)} encodings "
+                  f"(from {len(encodings_found)} samples)")
+
+        total_elapsed = time.time() - total_start
+        print(f"\n[TRAIN] Complete in {total_elapsed:.1f}s")
+        print(f"[TRAIN] Trained: {trained_names}")
+        print(f"[TRAIN] Failed:  {failed_names}")
+
+        if not trained_names:
+            return jsonify({
+                'success': False,
+                'error': f'No faces could be detected for: {", ".join(failed_names)}. '
+                         f'Please re-register with a clearer face visible.'
+            }), 400
+
+        engine.save_encodings()
+        print(f"[TRAIN] Saved. Total encodings: {len(engine.known_encodings)}")
+        print("=" * 55 + "\n")
+
+        msg = f'Model trained for: {", ".join(trained_names)}.'
+        if failed_names:
+            msg += f' Failed (no face detected): {", ".join(failed_names)}.'
+
+        return jsonify({'success': True, 'message': msg,
+                        'trained': trained_names, 'failed': failed_names})
+
+    except Exception as e:
+        import traceback
+        print(f"\n[TRAIN] FATAL ERROR: {e}")
+        traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': f'No faces could be detected for: {", ".join(failed_names)}. '
-                     f'Please re-register with a clearer face visible.'
-        }), 400
-
-    engine.save_encodings()
-
-    msg = f'Model trained for: {", ".join(trained_names)}.'
-    if failed_names:
-        msg += f' Failed (no face detected): {", ".join(failed_names)}.'
-
-    return jsonify({'success': True, 'message': msg,
-                    'trained': trained_names, 'failed': failed_names})
+            'error': f'Training crashed: {str(e)}'
+        }), 500
 
 
 @app.route('/stop_feed')
