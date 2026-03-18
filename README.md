@@ -67,7 +67,7 @@ After registering, the person won't be recognized yet.
 
 ### Attendance & Alerts
 - **Attendance** tab — filter by date/name, export to CSV
-- **Alerts** tab — review unknown face snapshots, mark reviewed or delete
+- **Alerts** tab — review unknown face snapshots, mark reviewed or delete.
 
 ---
 
