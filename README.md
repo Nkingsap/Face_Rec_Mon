@@ -4,7 +4,7 @@
 
 Real-time face recognition and attendance tracking built with Python and Flask.
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14%2B-blue?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-2.3%2B-black?logo=flask)
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.8%2B-green?logo=opencv)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
@@ -37,6 +37,7 @@ cd Face_Rec_Mon
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+pip install git+https://github.com/ageitgey/face_recognition_models
 ```
 
 ### 3. Run
@@ -124,6 +125,7 @@ Face_Rec_Mon/
 
 - **dlib** takes 5–15 min to compile on first install
 - For better accuracy (GPU required), switch model to `cnn` in `config.py`
+- **Python 3.14+**: `setuptools >= 80` removed `pkg_resources`, which `face_recognition_models` needs. That's why `requirements.txt` pins `setuptools<79`. If you see _"Please install face_recognition_models"_ but the package is already installed, this is the cause.
 
 ---
 
