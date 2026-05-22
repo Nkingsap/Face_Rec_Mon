@@ -82,6 +82,15 @@ class DatabaseHandler:
             )
         ''')
 
+        # Seed default admin if the table is empty
+        cursor.execute('SELECT COUNT(*) FROM admin')
+        if cursor.fetchone()[0] == 0:
+            default_pass_hash = hashlib.sha256(b'admin123').hexdigest()
+            cursor.execute(
+                'INSERT INTO admin (username, password) VALUES (?, ?)',
+                ('admin', default_pass_hash)
+            )
+
         conn.commit()
         conn.close()
 
